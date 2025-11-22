@@ -1,0 +1,9 @@
+faiss-cpu
+sentence-transformers
+torch
+pyyaml
+python-dotenv
+pypdf
+gradio
+tqdm
+rich

@@ -1,0 +1,14 @@
+paths:
+  data_dir: "./data"
+  index_dir: "./index"
+
+chunking:
+  chunk_size: 1000
+  overlap: 150
+
+retriever:
+  top_k: 4
+
+generator:
+  mode: "api"
+  model: "gpt-4o-mini"
