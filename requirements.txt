@@ -7,3 +7,4 @@ pypdf
 gradio
 tqdm
 rich
+openai
