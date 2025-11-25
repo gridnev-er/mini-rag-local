@@ -1,26 +1,27 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Iterable, List, Optional, Sequence
+from typing import List, Optional, Sequence
 
 from .retriever import RetrievedChunk
 
 
 @dataclass
 class SourceCitation:
-    index: int # порядковый номер
-    path: str # путь к файлу
-    snippet: str # короткий текст-превью
-    score: Optional[float] = None # опционально, мера релевантности 
+    index: int  # порядковый номер в списке "Источники"
+    path: str  # путь к файлу
+    snippet: str  # короткий текст-превью
+    score: Optional[float] = None  # опционально, мера релевантности
 
 
 def _normalize_snippet(text: str, max_len: int = 180) -> str:
-    
-    # Делает из полного текста чанка короткий сниппет
+    """
+    Делает из полного текста чанка короткий сниппет.
+    """
     if not text:
         return ""
 
-    # заменяем переводы строк на пробелы
+    # заменяем переводы строк и лишние пробелы
     snippet = " ".join(text.split())
 
     if len(snippet) <= max_len:
@@ -40,12 +41,13 @@ def build_citations(
     *,
     use_existing_snippet: bool = True,
 ) -> List[SourceCitation]:
-    
-    # Превращает список RetrievedChunk в список SourceCitation.
+    """
+    Превращает список RetrievedChunk в список SourceCitation.
+    """
     citations: List[SourceCitation] = []
     seen_chunk_ids = set()
 
-    for idx, ch in enumerate(chunks, start=1):
+    for ch in chunks:
         if ch.chunk_id in seen_chunk_ids:
             # защитимся от случайных дублей
             continue
@@ -56,9 +58,12 @@ def build_citations(
         else:
             snippet = _normalize_snippet(ch.text)
 
+        # index — это номер в списке "Источники" (без пропусков)
+        index = len(citations) + 1
+
         citations.append(
             SourceCitation(
-                index=idx,
+                index=index,
                 path=ch.path,
                 snippet=snippet,
                 score=ch.score,
@@ -73,8 +78,9 @@ def format_citations_markdown(
     *,
     show_scores: bool = False,
 ) -> str:
-    
-    # Формирует Markdown-блок "Источники" по списку SourceCitation.
+    """
+    Формирует Markdown-блок "Источники" по списку SourceCitation.
+    """
     if not citations:
         return "Источники:\n—"
 
@@ -89,15 +95,16 @@ def format_citations_markdown(
 
 
 if __name__ == "__main__":
-
     print("[CIT] Самотест: формирование раздела 'Источники'.")
 
     fake_chunks = [
         RetrievedChunk(
             chunk_id=0,
             path="data/doc1.txt",
-            text="RAG — это подход, который сочетает поиск по документам и LLM. "
-                 "Он позволяет отвечать на вопросы только по вашим файлам.",
+            text=(
+                "RAG — это подход, который сочетает поиск по документам и LLM. "
+                "Он позволяет отвечать на вопросы только по вашим файлам."
+            ),
             snippet="RAG — это подход, который сочетает поиск по документам и LLM.",
             index_in_doc=0,
             score=0.92,
@@ -105,8 +112,10 @@ if __name__ == "__main__":
         RetrievedChunk(
             chunk_id=1,
             path="data/doc2.txt",
-            text="FAISS используется для быстрого поиска по векторным эмбеддингам. "
-                 "Он хорошо подходит для локальных мини-RAG систем.",
+            text=(
+                "FAISS используется для быстрого поиска по векторным эмбеддингам. "
+                "Он хорошо подходит для локальных мини-RAG систем."
+            ),
             snippet="FAISS используется для быстрого поиска по векторным эмбеддингам.",
             index_in_doc=0,
             score=0.88,

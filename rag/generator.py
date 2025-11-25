@@ -1,11 +1,12 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Literal
 
 import openai
 
 from .retriever import RetrievalResult, RetrievedChunk
+from .citations import SourceCitation, build_citations
 
 
 GenerationStatus = Literal["ok", "insufficient"]
@@ -13,22 +14,23 @@ GenerationStatus = Literal["ok", "insufficient"]
 
 @dataclass
 class GenerationConfig:
-    model: str # имя модели для API
-    max_new_tokens: int = 250 # сколько токенов максимум генерировать
-    temperature: float = 0.3 # насколько ответ "творческий" (0.2–0.3 для RAG)
-    top_p: float = 0.9 # ещё один регулятор случайности
+    model: str  # имя модели для API
+    max_new_tokens: int = 250  # сколько токенов максимум генерировать
+    temperature: float = 0.3  # насколько ответ "творческий" (0.2–0.3 для RAG)
+    top_p: float = 0.9  # ещё один регулятор случайности
 
 
 @dataclass
 class GenerationResult:
     status: GenerationStatus
-    answer: str # текст ответа
-    used_chunks: list[RetrievedChunk] # список чанков, на основе которых отвечали
+    answer: str  # текст ответа
+    used_chunks: list[RetrievedChunk]  # список чанков, на основе которых отвечали
+    citations: list[SourceCitation] = field(default_factory=list)  # источники для "Источников"
 
 
 class AnswerGenerator:
-    
-    # Обёртка над вызовом LLM.
+    """Обёртка над вызовом LLM, которая работает поверх результатов ретрива."""
+
     def __init__(self, api_key: str, cfg: GenerationConfig) -> None:
         if not api_key or api_key == "your_key_here":
             # Для реальной работы нужно будет подставить реальный ключ
@@ -41,7 +43,6 @@ class AnswerGenerator:
         openai.api_key = api_key
 
     def _build_system_prompt(self) -> str:
-        
         # Системное сообщение — объясняем модели её роль.
         return (
             "Ты ассистент, который отвечает ТОЛЬКО на основе предоставленного контекста.\n"
@@ -81,15 +82,11 @@ class AnswerGenerator:
         )
         return prompt
 
-
     def generate(self, retrieval: RetrievalResult) -> GenerationResult:
         """
-        Главный метод: по результату ретрива возвращает текст ответа.
-
-        Логика:
-        - если status = "insufficient" или чанков нет -> сразу стандартный ответ;
-        - иначе -> собираем промпт и вызываем LLM.
+        По результату ретрива возвращает текст ответа и список источников.
         """
+
         # 1) Если контекста нет — даже не ходим в модель
         if retrieval.status != "ok" or not retrieval.chunks:
             msg = "Данных из источников недостаточно для точного ответа."
@@ -97,6 +94,7 @@ class AnswerGenerator:
                 status="insufficient",
                 answer=msg,
                 used_chunks=[],
+                citations=[],
             )
 
         system_prompt = self._build_system_prompt()
@@ -131,19 +129,23 @@ class AnswerGenerator:
                 status="insufficient",
                 answer="Не удалось получить ответ от модели.",
                 used_chunks=retrieval.chunks,
+                citations=[],
             )
+
+        # 3) Строим список источников на основе использованных чанков
+        citations = build_citations(retrieval.chunks)
 
         return GenerationResult(
             status="ok",
             answer=answer_text,
             used_chunks=retrieval.chunks,
+            citations=citations,
         )
 
 
 if __name__ == "__main__":
-
-    from pathlib import Path
     from .retriever import RetrievedChunk, RetrievalResult
+    # from .citations import format_citations_markdown  # можно раскомментировать позже
 
     print("[GEN] Самотест: сборка промпта и попытка вызова модели (если есть ключ).")
 
@@ -160,7 +162,9 @@ if __name__ == "__main__":
         RetrievedChunk(
             chunk_id=1,
             path="data/doc2.txt",
-            text="FAISS используется для быстрого поиска по векторным эмбеддингам.",
+            text=(
+                "FAISS используется для быстрого поиска по векторным эмбеддингам."
+            ),
             snippet="FAISS используется...",
             index_in_doc=0,
             score=0.85,
@@ -183,7 +187,7 @@ if __name__ == "__main__":
             "[GEN] OPENAI_API_KEY не задан или это заглушка. "
             "Покажем только собранный user-промпт."
         )
-        cfg = GenerationConfig(model="gpt-5.1")
+        cfg = GenerationConfig(model="gpt-4o-mini")
         gen = AnswerGenerator.__new__(AnswerGenerator)  # создаём объект без __init__
         gen.cfg = cfg
         # вручную зовём приватный метод для демонстрации
@@ -191,7 +195,7 @@ if __name__ == "__main__":
         print("------ USER PROMPT ------")
         print(user_prompt)
     else:
-        cfg = GenerationConfig(model="gpt-5.1")
+        cfg = GenerationConfig(model="gpt-4o-mini")
         gen = AnswerGenerator(api_key=api_key, cfg=cfg)
         result = gen.generate(retrieval)
         print("------ ANSWER ------")
