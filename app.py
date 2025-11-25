@@ -5,6 +5,8 @@ import json
 from pathlib import Path
 from typing import Dict, Tuple, Any
 
+import gradio as gr
+
 from rag.config import load_config
 from rag.embeddings import EmbeddingEncoder
 from rag.index_store import load_index
@@ -135,7 +137,12 @@ def main() -> None:
     parser.add_argument(
         "--ask",
         type=str,
-        help="Задать вопрос по индексированным документам.",
+        help="Задать вопрос по индексированным документам (CLI-режим).",
+    )
+    parser.add_argument(
+        "--ui",
+        action="store_true",
+        help="Запустить веб-интерфейс Gradio.",
     )
 
     args = parser.parse_args()
@@ -147,7 +154,7 @@ def main() -> None:
         print(e)
         return
 
-    # Если передан вопрос через --ask, работаем в CLI-режиме
+    # CLI-режим: python app.py --ask "вопрос"
     if args.ask:
         question = args.ask.strip()
         if not question:
@@ -167,10 +174,61 @@ def main() -> None:
 
         print("\n------ ИСТОЧНИКИ ------")
         print(format_citations_markdown(result.citations, show_scores=True))
-    else:
-        # Если аргументов нет — просто самотест и краткая сводка
-        print("\n[APP] Самотест пройден успешно.")
-        print(f"[APP] Число чанков: {len(retriever.chunks_by_id)}")
+        return
+
+    # Веб-интерфейс: python app.py --ui
+    if args.ui:
+        top_k = cfg.get("retriever", {}).get("top_k", 4)
+
+        def answer_ui(question: str) -> tuple[str, str]:
+            q = (question or "").strip()
+            if not q:
+                return "Пожалуйста, введите вопрос.", "Источники:\n—"
+
+            retrieval = retriever.search(q, top_k=top_k)
+            result = generator.generate(retrieval)
+
+            answer_md = result.answer
+            sources_md = format_citations_markdown(result.citations, show_scores=True)
+            return answer_md, sources_md
+
+        with gr.Blocks() as demo:
+            gr.Markdown(
+                "# mini-rag-local\n"
+                "Локальный ассистент по вашим документам (RAG)."
+            )
+
+            with gr.Row():
+                question_box = gr.Textbox(
+                    label="Вопрос",
+                    placeholder="Спросите что-нибудь по документам из папки data/...",
+                    lines=2,
+                )
+
+            answer_md = gr.Markdown(label="Ответ")
+            sources_md = gr.Markdown(label="Источники")
+
+            ask_btn = gr.Button("Спросить")
+
+            ask_btn.click(
+                answer_ui,
+                inputs=question_box,
+                outputs=[answer_md, sources_md],
+            )
+            # Поддержка Enter в текстовом поле
+            question_box.submit(
+                answer_ui,
+                inputs=question_box,
+                outputs=[answer_md, sources_md],
+            )
+
+        print("[APP] Запуск веб-интерфейса Gradio...")
+        demo.launch()
+        return
+
+    # Если аргументов нет — просто самотест и краткая сводка
+    print("\n[APP] Самотест пройден успешно.")
+    print(f"[APP] Число чанков: {len(retriever.chunks_by_id)}")
 
 
 if __name__ == "__main__":
