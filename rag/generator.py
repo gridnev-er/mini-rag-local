@@ -3,7 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Literal
 
-import openai
+from openai import OpenAI
+
 
 from .retriever import RetrievalResult, RetrievedChunk
 from .citations import SourceCitation, build_citations
@@ -29,8 +30,8 @@ class GenerationResult:
 
 
 class AnswerGenerator:
-    """Обёртка над вызовом LLM, которая работает поверх результатов ретрива."""
-
+    
+    # Обёртка над вызовом LLM.
     def __init__(self, api_key: str, cfg: GenerationConfig) -> None:
         if not api_key or api_key == "your_key_here":
             # Для реальной работы нужно будет подставить реальный ключ
@@ -40,18 +41,26 @@ class AnswerGenerator:
             )
 
         self.cfg = cfg
-        openai.api_key = api_key
+        # Новый клиент из openai>=1.0
+        self.client = OpenAI(api_key=api_key)
+
 
     def _build_system_prompt(self) -> str:
-        # Системное сообщение — объясняем модели её роль.
+        """
+        Системное сообщение — объясняем модели её роль и правила.
+        """
         return (
-            "Ты ассистент, который отвечает ТОЛЬКО на основе предоставленного контекста.\n"
+            "Ты ассистент, который в первую очередь отвечает на основе предоставленного контекста.\n"
             "Твои правила:\n"
-            "- Используй только факты из контекста ниже.\n"
-            "- Если информации недостаточно, честно скажи, что ответить нельзя.\n"
+            "- Используй факты из контекста ниже как основной источник.\n"
+            "- Если точной инструкции или формулировки нет, но в контексте есть косвенные намёки, "
+            "можешь сделать осторожное предположение и явно отметить в ответе, что это догадка.\n"
+            "- Если вообще нет зацепок в контексте, честно скажи, что не можешь ответить на основе "
+            "предоставленных документов.\n"
             "- Не придумывай ссылки или источники, которых нет в контексте.\n"
-            "- Отвечай кратко и по делу, можно в Markdown."
+            "- Отвечай кратко и по делу."
         )
+
 
     def _build_user_prompt(
         self,
@@ -108,20 +117,22 @@ class AnswerGenerator:
             {"role": "user", "content": user_prompt},
         ]
 
-        # 2) Вызов LLM через ChatCompletion
-        response = openai.ChatCompletion.create(
+        # 2) Вызов LLM через новый клиент OpenAI
+        response = self.client.chat.completions.create(
             model=self.cfg.model,
             messages=messages,
-            max_tokens=self.cfg.max_new_tokens,
+            # max_tokens в новой библиотеке заменён на max_completion_tokens
+            max_completion_tokens=self.cfg.max_new_tokens,
             temperature=self.cfg.temperature,
             top_p=self.cfg.top_p,
         )
 
         answer_text = (
-            response["choices"][0]["message"]["content"].strip()
-            if response and response.get("choices")
+            response.choices[0].message.content.strip()
+            if response and response.choices
             else ""
         )
+
 
         if not answer_text:
             # На всякий случай fallback — не удалось получить нормальный ответ
