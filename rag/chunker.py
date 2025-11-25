@@ -79,25 +79,3 @@ def chunk_documents(
     )
 
     return chunks
-
-
-if __name__ == "__main__":
-
-    from .config import load_config
-    from .io_loaders import load_documents
-
-    cfg = load_config()
-    docs = load_documents(cfg["paths"]["data_dir"])
-
-    chunk_size = cfg["chunking"]["chunk_size"]
-    overlap = cfg["chunking"]["overlap"]
-
-    chunks = chunk_documents(docs, chunk_size=chunk_size, overlap=overlap)
-
-    print("--- Пример чанка ---")
-    if chunks:
-        ch = chunks[0]
-        print("id:", ch.id)
-        print("path:", ch.path)
-        print("index_in_doc:", ch.index_in_doc)
-        print("snippet:", ch.snippet)

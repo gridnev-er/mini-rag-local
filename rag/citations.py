@@ -92,38 +92,3 @@ def format_citations_markdown(
         lines.append(base)
 
     return "\n".join(lines)
-
-
-if __name__ == "__main__":
-    print("[CIT] Самотест: формирование раздела 'Источники'.")
-
-    fake_chunks = [
-        RetrievedChunk(
-            chunk_id=0,
-            path="data/doc1.txt",
-            text=(
-                "RAG — это подход, который сочетает поиск по документам и LLM. "
-                "Он позволяет отвечать на вопросы только по вашим файлам."
-            ),
-            snippet="RAG — это подход, который сочетает поиск по документам и LLM.",
-            index_in_doc=0,
-            score=0.92,
-        ),
-        RetrievedChunk(
-            chunk_id=1,
-            path="data/doc2.txt",
-            text=(
-                "FAISS используется для быстрого поиска по векторным эмбеддингам. "
-                "Он хорошо подходит для локальных мини-RAG систем."
-            ),
-            snippet="FAISS используется для быстрого поиска по векторным эмбеддингам.",
-            index_in_doc=0,
-            score=0.88,
-        ),
-    ]
-
-    citations = build_citations(fake_chunks)
-    md = format_citations_markdown(citations, show_scores=True)
-
-    print("------ MARKDOWN ------")
-    print(md)

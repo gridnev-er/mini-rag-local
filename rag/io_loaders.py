@@ -175,19 +175,3 @@ def load_documents(data_dir: Path | str) -> List[Document]:
     )
 
     return documents
-
-
-if __name__ == "__main__":
-    # Небольшой ручной тест:
-    # можно запустить `python -m rag.io_loaders` из корня проекта,
-    # чтобы проверить, как он читает файлы из ./data.
-    docs = load_documents("./data")
-    print(f"Загружено документов: {len(docs)}")
-    if docs:
-        first = docs[0]
-        print("--- Пример документа ---")
-        print("path:", first.path)
-        print("kind:", first.kind)
-        print("num_chars:", first.num_chars)
-        print("preview:")
-        print(first.text[:300], "...")
