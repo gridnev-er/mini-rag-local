@@ -12,9 +12,6 @@ import numpy as np
 from .embeddings import EmbeddingMeta
 
 
-# --- Модели данных ---
-
-
 @dataclass
 class IndexMeta:
     embedding_model: str # имя модели эмбеддингов
@@ -143,34 +140,3 @@ def load_index(index_dir: Path | str) -> LoadedIndex:
     )
 
     return LoadedIndex(index=index, row_ids=row_ids, meta=meta)
-
-
-if __name__ == "__main__":
-
-    from .embeddings import EmbeddingEncoder
-
-    print("[INDEX] Самотест: строим индекс по двум тестовым предложениям.")
-
-    encoder = EmbeddingEncoder()
-    texts = [
-        "Это первый тестовый текст.",
-        "А это второй тестовый текст.",
-    ]
-    embs = encoder.embed_texts(texts)  # (2, dim)
-
-    idx = build_faiss_index(embs)
-    row_ids = np.array([0, 1], dtype="int64")
-    meta = IndexMeta.from_embedding_meta(encoder.meta, num_vectors=len(row_ids))
-
-    test_dir = Path("./index_test")
-    save_index(test_dir, idx, row_ids, meta)
-
-    loaded = load_index(test_dir)
-
-    # Простой запрос: похожесть первой строки на обе
-    query_vec = embs[0].reshape(1, -1)
-    scores, indices = loaded.index.search(query_vec, k=2)
-    print("[INDEX] Результат поиска для первого эмбеддинга:")
-    print("scores:", scores)
-    print("indices:", indices)
-    print("row_ids:", loaded.row_ids[indices[0]])

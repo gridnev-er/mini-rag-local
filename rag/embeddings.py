@@ -95,19 +95,3 @@ class EmbeddingEncoder:
         vectors = self.embed_texts([query], batch_size=1, normalize=normalize)
         # embed_texts вернул (1, dim) → берём единственную строку
         return vectors[0]
-
-
-if __name__ == "__main__":
-
-    encoder = EmbeddingEncoder()
-    print("[EMB] Модель:", encoder.meta.model_name)
-    print("[EMB] Размерность эмбеддинга:", encoder.meta.dim)
-
-    sample_texts = [
-        "Это первый тестовый текст для эмбеддингов.",
-        "А это второй текст, немного другой по смыслу.",
-    ]
-
-    embs = encoder.embed_texts(sample_texts)
-    print("[EMB] Форма матрицы эмбеддингов:", embs.shape)
-    print("[EMB] Пример первого вектора (первые 5 значений):", embs[0][:5])
