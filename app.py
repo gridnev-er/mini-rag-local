@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import argparse
 import json
 from pathlib import Path
 from typing import Dict, Tuple, Any
@@ -10,6 +11,7 @@ from rag.index_store import load_index
 from rag.chunker import Chunk
 from rag.retriever import Retriever
 from rag.generator import GenerationConfig, AnswerGenerator
+from rag.citations import format_citations_markdown
 
 
 def _load_chunks_jsonl(chunks_path: Path) -> Dict[int, Chunk]:
@@ -126,12 +128,50 @@ def init_pipeline(config_path: str = "config.yaml") -> Tuple[dict, Retriever, An
     return cfg, retriever, generator
 
 
-if __name__ == "__main__":
-    # Простой самотест: пробуем собрать пайплайн и выводим краткую сводку.
+def main() -> None:
+    parser = argparse.ArgumentParser(
+        description="Mini-RAG по локальным документам."
+    )
+    parser.add_argument(
+        "--ask",
+        type=str,
+        help="Задать вопрос по индексированным документам.",
+    )
+
+    args = parser.parse_args()
+
     try:
         cfg, retriever, generator = init_pipeline()
-        print("\n[APP] Самотест пройден успешно.")
-        print(f"[APP] Число чанков: {len(retriever.chunks_by_id)}")
     except Exception as e:
         print("[APP] Ошибка при инициализации пайплайна:")
         print(e)
+        return
+
+    # Если передан вопрос через --ask, работаем в CLI-режиме
+    if args.ask:
+        question = args.ask.strip()
+        if not question:
+            print("Пожалуйста, введите непустой вопрос.")
+            return
+
+        top_k = cfg.get("retriever", {}).get("top_k", 4)
+
+        print("------ ВОПРОС ------")
+        print(question)
+
+        retrieval = retriever.search(question, top_k=top_k)
+        result = generator.generate(retrieval)
+
+        print("\n------ ОТВЕТ ------")
+        print(result.answer)
+
+        print("\n------ ИСТОЧНИКИ ------")
+        print(format_citations_markdown(result.citations, show_scores=True))
+    else:
+        # Если аргументов нет — просто самотест и краткая сводка
+        print("\n[APP] Самотест пройден успешно.")
+        print(f"[APP] Число чанков: {len(retriever.chunks_by_id)}")
+
+
+if __name__ == "__main__":
+    main()
